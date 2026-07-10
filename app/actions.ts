@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { generateClientId, generateJobOrderId, generateItemId, getNextJOSequence } from '@/lib/ids'
 import { computeLineTotal } from '@/lib/pricing'
 import { extractClientIdFromQr } from '@/lib/qr'
+import { getPhilippineDateStr } from '@/lib/date'
 import type { DraftItem } from './CreateSpecsModal'
 
 type ActionResult =
@@ -99,6 +100,31 @@ export async function lookupClientForCheckout(qrValue: string): Promise<QrLookup
   return { success: true, clientId: data.client_id, clientName: data.client_name || data.company_name || data.client_id }
 }
 
+type UploadResult =
+  | { success: true; path: string }
+  | { success: false; message: string }
+
+// Uploads the client's actual attached file (full resolution, whether it's their
+// print-ready art or just a layout reference) to a temporary "pending/" location
+// as soon as they attach it in Create Specs — before the job order (and its real
+// item_id) exists yet. submitJobOrder moves it into its final dated folder once
+// the order is actually placed. This has to be its own action taking a FormData:
+// Server Actions can't accept a raw File nested inside a larger object/array
+// argument, only FormData (or a File) as a top-level argument.
+export async function uploadOriginalFile(formData: FormData): Promise<UploadResult> {
+  const file = formData.get('file')
+  if (!(file instanceof File)) return { success: false, message: 'No file provided.' }
+
+  const admin = createSupabaseAdminClient()
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `pending/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+  const { error } = await admin.storage.from('jo-print-files').upload(path, file, {
+    contentType: file.type || 'application/octet-stream',
+  })
+  if (error) return { success: false, message: error.message }
+  return { success: true, path }
+}
+
 type CheckoutResult =
   | { success: true; jobOrderId: string }
   | { success: false; message: string }
@@ -188,6 +214,27 @@ export async function submitJobOrder(data: {
       job_status: 'Received',
     })
     if (itemErr) return { success: false, message: itemErr.message }
+
+    // Best-effort: relocate the client's actual uploaded file (full resolution,
+    // already sitting in storage under a temporary "pending/" path — see
+    // uploadOriginalFile below) into its final dated folder now that we know
+    // the real item_id — separate from item_preview above, which is only a
+    // small compressed thumbnail. Grouped by calendar day so staff can browse
+    // "today's" prints. Never blocks or fails the JO save if this errors out
+    // (same policy as the tracking email below).
+    if (item.original_file_path) {
+      try {
+        const folder = getPhilippineDateStr(receivedAt)
+        const originalName = item.original_file_path.split('/').pop()
+        const finalPath = `${folder}/${itemId}-${originalName}`
+        const { error: moveErr } = await admin.storage.from('jo-print-files').move(item.original_file_path, finalPath)
+        if (!moveErr) {
+          await admin.from('job_order_items').update({ original_file_path: finalPath }).eq('item_id', itemId)
+        }
+      } catch {
+        // Ignore — printing file is a nice-to-have, not a checkout blocker.
+      }
+    }
 
     await admin.from('job_order_item_status_log').insert({
       item_id: itemId,

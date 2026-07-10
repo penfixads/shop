@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { computeLineTotal, formatPeso, PRICING_LABELS } from '@/lib/pricing'
 import { compressImageToDataUrl } from '@/lib/image'
+import { uploadOriginalFile } from './actions'
 
 // Flat add-on for clients who want staff to design the layout instead of
 // supplying their own ready file. Not part of the internal JO system yet
@@ -27,6 +28,12 @@ export interface DraftItem {
   notes: string
   date_time_needed: string | null
   item_preview: string
+  // Storage path of the client's actual attached file (full resolution) — already
+  // uploaded to a temporary "pending/" location by the time this item is added to
+  // the cart (see uploadOriginalFile in actions.ts); submitJobOrder moves it into
+  // its final dated folder. A plain string, not the File itself — Server Actions
+  // can't accept a raw File nested inside a larger object/array argument.
+  original_file_path: string | null
   needs_layout_help: boolean
   layout_fee: number
   line_total: number
@@ -61,6 +68,9 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
   const [needsLayoutHelp, setNeedsLayoutHelp] = useState(false)
   const [preview, setPreview] = useState('')
   const [previewBytes, setPreviewBytes] = useState<number | null>(null)
+  const [originalFileName, setOriginalFileName] = useState('')
+  const [originalFilePath, setOriginalFilePath] = useState<string | null>(null)
+  const [uploadingOriginal, setUploadingOriginal] = useState(false)
   const [compressing, setCompressing] = useState(false)
   const [previewError, setPreviewError] = useState('')
   const [formError, setFormError] = useState('')
@@ -91,15 +101,29 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
   async function handlePreviewFile(file: File | null) {
     if (!file) return
     setPreviewError('')
+    setOriginalFileName(file.name)
+    setOriginalFilePath(null)
     setCompressing(true)
+    setUploadingOriginal(true)
+
+    // Two independent things happen with the same file: a small compressed
+    // thumbnail for on-screen preview (can fail, e.g. browsers can't decode
+    // TIFF, without blocking anything), and the real full-resolution file
+    // uploaded to storage for actual printing (a separate Server Action taking
+    // FormData, since a raw File can't be nested inside the cart item passed to
+    // submitJobOrder later).
+    compressImageToDataUrl(file)
+      .then(({ dataUrl, bytes }) => { setPreview(dataUrl); setPreviewBytes(bytes) })
+      .catch((e: any) => setPreviewError(e.message || 'Failed to process image.'))
+      .finally(() => setCompressing(false))
+
     try {
-      const { dataUrl, bytes } = await compressImageToDataUrl(file)
-      setPreview(dataUrl)
-      setPreviewBytes(bytes)
-    } catch (e: any) {
-      setPreviewError(e.message || 'Failed to process image.')
+      const formData = new FormData()
+      formData.append('file', file)
+      const result = await uploadOriginalFile(formData)
+      if (result.success) setOriginalFilePath(result.path)
     } finally {
-      setCompressing(false)
+      setUploadingOriginal(false)
     }
   }
 
@@ -130,6 +154,7 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
       notes: remarks,
       date_time_needed: dateNeeded ? new Date(dateNeeded).toISOString() : null,
       item_preview: preview,
+      original_file_path: originalFilePath,
       needs_layout_help: needsLayoutHelp,
       layout_fee: layoutFee,
       line_total: lineTotal,
@@ -177,11 +202,19 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
           ) : (
             <div onPaste={handlePreviewPaste} tabIndex={0} style={{ border: '1.5px dashed rgba(255,255,255,0.3)', borderRadius: 8, padding: '0.6rem 0.75rem', outline: 'none' }}>
               <input type="file" accept="image/*" onChange={e => handlePreviewFile(e.target.files?.[0] || null)} className="pf-input" style={{ border: 'none', padding: 0 }} />
-              <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>Optional — a logo or reference image for your job. ...or click here and paste (Ctrl+V) a screenshot</div>
+              <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>
+                Optional — <b>upload</b> the actual file you want printed, or <b>paste (Ctrl+V)</b> a reference/mockup image if you're just showing us the layout idea you want.
+              </div>
             </div>
           )}
           {compressing && <div style={{ color: '#E8B9C6', fontSize: '0.72rem', marginTop: 4 }}>Compressing image…</div>}
-          {previewError && <div style={{ color: '#e74c3c', fontSize: '0.72rem', marginTop: 4 }}>{previewError}</div>}
+          {uploadingOriginal && <div style={{ color: '#E8B9C6', fontSize: '0.72rem', marginTop: 4 }}>Uploading file…</div>}
+          {previewError && (
+            <div style={{ color: '#e74c3c', fontSize: '0.72rem', marginTop: 4 }}>
+              {previewError}
+              {originalFileName && <> No on-screen preview, but <b>{originalFileName}</b> will still be saved for printing.</>}
+            </div>
+          )}
         </div>
 
         <div className="pf-field">
@@ -192,6 +225,11 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
           <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>
             {formatPeso(LAYOUT_FEE)} is a starting estimate — the actual layout fee can be lower or higher depending on how complex your design turns out to be. Our team will confirm the final amount with you before starting.
           </div>
+          {needsLayoutHelp && originalFileName && (
+            <div style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 8, padding: '0.6rem 0.75rem', marginTop: 8, color: '#C9A84C', fontSize: '0.72rem' }}>
+              Since you're asking for layout help, we'll treat <b>{originalFileName}</b> as a reference for the look you want — not the final file to print. Our design team will create the layout around it and confirm with you before production.
+            </div>
+          )}
         </div>
 
         <div className="pf-grid-2" style={{ marginBottom: '0.85rem' }}>
@@ -276,7 +314,7 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: '1rem' }}>
           <button onClick={onClose} className="pf-btn pf-btn-secondary">Cancel</button>
-          <button onClick={handleAdd} disabled={compressing} className="pf-btn">Add to Job Order</button>
+          <button onClick={handleAdd} disabled={compressing || uploadingOriginal} className="pf-btn">Add to Job Order</button>
         </div>
       </div>
     </div>
