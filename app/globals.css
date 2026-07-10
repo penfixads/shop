@@ -1,0 +1,276 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+.pf-main-content { padding: 1.5rem; }
+@media (max-width: 768px) {
+  .pf-main-content { padding: 1rem; padding-top: 4rem; }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-inter), 'Inter', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-cormorant), 'Cormorant Garamond', serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ============================================================
+   Penfix form fields — light underline style (single source of truth)
+   Wrap each field in .pf-field; label = .pf-label (asterisk = .pf-req);
+   controls = .pf-input / .pf-select / .pf-textarea.
+   Sits on light surfaces (#fff / #FDF5EC / #F9EBD8). Maroon focus.
+   Copied verbatim from penfixads-OS/app/globals.css to keep the same
+   look across both apps — edit there too if this standard changes.
+   ============================================================ */
+.pf-field { margin-bottom: 1.15rem; }
+.pf-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #8a7d80;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.01em;
+}
+.pf-label .pf-req { color: #c0392b; }
+.pf-input, .pf-select, .pf-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid #d8ccc0;
+  border-radius: 0;
+  padding: 0.5rem 0.15rem;
+  font-size: 0.9rem;
+  color: #2a2426;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.pf-input::placeholder, .pf-textarea::placeholder { color: #b7abae; }
+.pf-input:focus, .pf-select:focus, .pf-textarea:focus { border-bottom-color: #5C001F; }
+.pf-input:disabled, .pf-select:disabled, .pf-textarea:disabled {
+  color: #b0a5a8;
+  cursor: not-allowed;
+  border-bottom-style: dashed;
+}
+.pf-select { cursor: pointer; }
+.pf-select option { background: #FDF5EC; color: #2a2426; }
+.pf-textarea { resize: vertical; min-height: 3rem; line-height: 1.5; }
+
+/* ============================================================
+   Penfix buttons — maroon fill, gold border (single source of truth)
+   Primary:   class="pf-btn"            (Save, Add, New, Submit)
+   Secondary: class="pf-btn pf-btn-secondary"  (Cancel, dismiss)
+   Full width: add pf-btn-block  ·  Icons: drop an <svg> inside, auto-sized
+   ============================================================ */
+.pf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: #5C001F;
+  color: #fff;
+  border: 1.5px solid #C9A84C;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.pf-btn:hover { background: #7A1828; }
+.pf-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.45); }
+.pf-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.pf-btn svg { width: 0.9rem; height: 0.9rem; flex-shrink: 0; }
+.pf-btn-block { width: 100%; }
+
+.pf-btn-secondary {
+  background: transparent;
+  color: #5C001F;
+  border-color: #d8ccc0;
+}
+.pf-btn-secondary:hover { background: rgba(92, 0, 31, 0.06); border-color: #5C001F; }
+
+/* ============================================================
+   Modal/popup + grid utilities — copied verbatim from
+   penfixads-OS/app/globals.css to keep the same look across both apps.
+   ============================================================ */
+.pf-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+.pf-modal-card {
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  padding: 2rem 1.75rem;
+  width: 100%;
+}
+.pf-modal-card .pf-btn:not(.pf-btn-secondary) { background: #8E2C48; }
+.pf-modal-card .pf-btn:not(.pf-btn-secondary):hover { background: #A3415D; }
+
+.pf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pf-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.pf-form-row { display: grid; grid-template-columns: repeat(var(--pf-row-cols, 2), 1fr); gap: 1.25rem; }
+@media (max-width: 480px) {
+  .pf-grid-2, .pf-grid-3, .pf-form-row { grid-template-columns: 1fr; }
+}
+
+.pf-modal-wine {
+  background: #5C001F;
+  color: #fff;
+}
+.pf-modal-wine h2, .pf-modal-wine h3 { color: #fff; }
+.pf-modal-wine .pf-label { color: #E8B9C6; font-size: 1.05rem; }
+.pf-modal-wine .pf-input, .pf-modal-wine .pf-select, .pf-modal-wine .pf-textarea {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.35);
+}
+.pf-modal-wine .pf-input::placeholder, .pf-modal-wine .pf-textarea::placeholder { color: rgba(255, 255, 255, 0.5); }
+.pf-modal-wine .pf-input:focus, .pf-modal-wine .pf-select:focus, .pf-modal-wine .pf-textarea:focus { border-bottom-color: #C9A84C; }
+.pf-modal-wine .pf-req { color: #ffd277; }
+.pf-modal-wine .pf-input::-webkit-calendar-picker-indicator { filter: invert(1); }
+.pf-modal-wine .pf-btn:not(.pf-btn-secondary) {
+  background:
+    linear-gradient(#5C001F, #5C001F) padding-box,
+    linear-gradient(to right, #77530a, #ffd277, #77530a, #77530a, #ffd277, #77530a) border-box;
+  background-size: 100% 100%, 250% 100%;
+  background-position: 0 0, left center;
+  border: 2px solid transparent;
+  color: #ffd277;
+  transition: background-position 1s, transform 0.15s;
+}
+.pf-modal-wine .pf-btn:not(.pf-btn-secondary):hover {
+  background:
+    linear-gradient(#400016, #400016) padding-box,
+    linear-gradient(to right, #77530a, #ffd277, #77530a, #77530a, #ffd277, #77530a) border-box;
+  background-size: 100% 100%, 250% 100%;
+  background-position: 0 0, right center;
+}
+.pf-modal-wine .pf-btn:not(.pf-btn-secondary):active { transform: scale(0.95); }
+.pf-modal-wine .pf-btn-secondary { background: transparent; color: #E8B9C6; border-color: rgba(255, 255, 255, 0.2); }
+.pf-modal-wine .pf-btn-secondary:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.35); }
+
+.pf-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #7A1828;
+}
+.pf-link-btn:hover { text-decoration: underline; }
+.pf-link-btn svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+.pf-modal-wine .pf-link-btn { color: #E3C878; }
+
+.pf-group-box {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+}
+.pf-modal-wine .pf-group-box { border-color: rgba(255, 255, 255, 0.18); }
+.pf-group-empty {
+  color: #E8B9C6;
+  font-size: 0.82rem;
+  font-style: italic;
+  padding: 0.2rem 0.1rem 0.75rem;
+}
+.pf-group-box-actions { display: flex; justify-content: flex-end; }
+
+/* Simple data-table look for catalog/pending/borrowed lists */
+.pf-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.pf-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a7d80;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1.5px solid #d8ccc0;
+}
+.pf-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #eee1d6; vertical-align: middle; }
+.pf-table tr:last-child td { border-bottom: none; }
+.pf-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+}
+
+/* Totals/summary box inside modals — copied verbatim from
+   penfixads-OS/app/globals.css so it matches the real JO system exactly.
+   Dark wine-rose by default; light cream inside .pf-modal-wine so the
+   figures still pop against the dark card. */
+.pf-totals-box {
+  background: #3D1523;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+.pf-modal-wine .pf-totals-box { background: #FDF5EC; border-color: #EDE0CC; }
+.pf-modal-wine .pf-totals-box .pf-totals-row { color: #000; }
+.pf-modal-wine .pf-totals-box .pf-input {
+  color: #1a1a1a;
+  border-bottom-color: #d8ccc0;
+}
+.pf-modal-wine .pf-totals-box .pf-input:focus { border-bottom-color: #5C001F; }
+.pf-totals-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #D9A8B5;
+  font-size: 0.82rem;
+  margin-bottom: 6px;
+}
+.pf-totals-row:last-child { margin-bottom: 0; }
+.pf-totals-box .pf-input {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.35);
+}
+.pf-totals-box .pf-input::placeholder { color: rgba(255, 255, 255, 0.4); }
+.pf-totals-box .pf-input:focus { border-bottom-color: #C9A84C; }
+
+/* Help desk popups (Registration/Assist/Rewards) swipe in from the right,
+   docked above the floating "?" button. Plain CSS animation instead of a
+   JS-timed transform so it always plays on mount, no race with rAF/paint. */
+@keyframes pf-slide-in-right {
+  from { transform: translateX(calc(100% + 2rem)); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.pf-helpdesk-panel {
+  animation: pf-slide-in-right 0.3s ease forwards;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

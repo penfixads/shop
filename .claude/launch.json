@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "penfixads-os",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\PENFIX~1\\penfixads-OS", "run", "dev", "--", "-p", "3003"],
+      "port": 3003
+    },
+    {
+      "name": "tools",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\PENFIX~1\\tools", "run", "dev", "--", "-p", "3004"],
+      "port": 3004
+    }
+  ]
+}
