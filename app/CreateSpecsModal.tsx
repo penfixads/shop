@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { computeLineTotal, formatPeso, PRICING_LABELS } from '@/lib/pricing'
+import { computeLineTotal, formatPeso, linearUnitLabel, PRICING_LABELS } from '@/lib/pricing'
 import { compressImageToDataUrl } from '@/lib/image'
 import { uploadOriginalFile } from './actions'
 
@@ -46,6 +46,7 @@ interface Subcategory {
   category_name: string
   pricing_model: string
   base_price: number
+  unit?: string | null
 }
 
 interface Props {
@@ -247,16 +248,16 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
           <div className={needsDepth ? 'pf-grid-3' : 'pf-grid-2'} style={{ marginBottom: '0.85rem' }}>
             <div>
               <label className="pf-label">Width</label>
-              <input type="number" value={width} onChange={e => setWidth(e.target.value)} placeholder="ft" className="pf-input" />
+              <input type="number" value={width} onChange={e => setWidth(e.target.value)} placeholder={linearUnitLabel(subcategory.unit)} className="pf-input" />
             </div>
             <div>
               <label className="pf-label">Height</label>
-              <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="ft" className="pf-input" />
+              <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder={linearUnitLabel(subcategory.unit)} className="pf-input" />
             </div>
             {needsDepth && (
               <div>
                 <label className="pf-label">Depth</label>
-                <input type="number" value={depth} onChange={e => setDepth(e.target.value)} placeholder="ft" className="pf-input" />
+                <input type="number" value={depth} onChange={e => setDepth(e.target.value)} placeholder={linearUnitLabel(subcategory.unit)} className="pf-input" />
               </div>
             )}
           </div>

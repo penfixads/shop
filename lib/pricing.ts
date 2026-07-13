@@ -6,11 +6,10 @@ export function formatPriceLabel(pricingModel: string, basePrice: number, unit?:
   const price = `₱${basePrice.toFixed(2)}`
   switch (pricingModel) {
     case 'area':
-      return `From ${price} / sq ft`
     case 'dimension':
-      return `From ${price} / sq ft`
+      return `From ${price} / ${unit || 'sq ft'}`
     case 'area_cube':
-      return `From ${price} / cu ft`
+      return `From ${price} / ${unit || 'cu ft'}`
     case 'per_piece':
       return `From ${price} / pc`
     case 'per_set':
@@ -28,6 +27,15 @@ export function formatPriceLabel(pricingModel: string, basePrice: number, unit?:
     default:
       return `From ${price}`
   }
+}
+
+// The `unit` column stores the pricing unit (e.g. "sqin", "sqft", "cuft"), not the
+// linear measurement unit a client types into a Width/Height/Depth field — so a
+// cabinet priced "per sqin" still needs its dimension inputs labeled "in", not "sqin".
+export function linearUnitLabel(unit?: string | null): string {
+  if (!unit) return 'ft'
+  const stripped = unit.trim().replace(/^(sq|cu)\s*/i, '')
+  return stripped || unit
 }
 
 export const PRICING_LABELS: Record<string, string> = {
