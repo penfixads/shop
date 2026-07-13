@@ -293,8 +293,16 @@ export function RewardsModal({ onClose }: { onClose: () => void }) {
   const [uploadedClient, setUploadedClient] = useState<{ clientId: string; clientName: string } | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  // Lets "← Back" return to the register/upload prompt even for an already-stored
+  // client, since getStoredClient() would otherwise re-select them every render.
+  const [dismissed, setDismissed] = useState(false)
 
-  const activeClient = stored || uploadedClient
+  const activeClient = dismissed ? null : stored || uploadedClient
+
+  function goBack() {
+    setUploadedClient(null)
+    setDismissed(true)
+  }
 
   const [loading, setLoading] = useState(!!activeClient)
   const [points, setPoints] = useState<number | null>(null)
@@ -347,7 +355,11 @@ export function RewardsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <HelpDeskModal title="Rewards" avatar={BlankAvatar} onClose={onClose}>
-      <ClientQrCode clientId={activeClient.clientId} clientName={activeClient.clientName} />
+      <ClientQrCode
+        clientId={activeClient.clientId}
+        clientName={activeClient.clientName}
+        onBack={goBack}
+      />
       <p style={{ textAlign: 'center', color: '#999', fontSize: '0.72rem', marginBottom: '1rem' }}>
         Show this to staff to check or redeem points
       </p>
