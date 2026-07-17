@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useLayoutEffect, useEffect } from 'react'
 import Image from 'next/image'
-import { formatPriceLabel } from '@/lib/pricing'
+import { formatPriceLabel, formatStartsAtLabel, isQuoteOnlyCategory } from '@/lib/pricing'
 import CreateSpecsModal, { type DraftItem } from './CreateSpecsModal'
 import { RegistrationModal, RewardsModal, JobOrderModal } from './HelpDeskModals'
 
@@ -237,7 +237,9 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
                 <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#2a2426' }}>{s.subcategory_name}</div>
                 <div style={{ fontSize: '0.72rem', color: '#999', marginBottom: '0.4rem' }}>{s.subcategory_id}</div>
                 <div style={{ fontSize: '0.85rem', color: '#1a5a1a', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  {formatPriceLabel(s.pricing_model, s.base_price, s.unit)}
+                  {isQuoteOnlyCategory(s.category_id)
+                    ? formatStartsAtLabel(s.pricing_model, s.base_price, s.unit)
+                    : formatPriceLabel(s.pricing_model, s.base_price, s.unit)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#E5E5E5', borderRadius: 8, padding: '0.2rem 0.4rem' }}>
@@ -245,7 +247,9 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
                     <span style={{ fontSize: '0.85rem', minWidth: 16, textAlign: 'center' }}>{getQty(s.subcategory_id)}</span>
                     <button className="pf-btn pf-btn-secondary" style={{ padding: '0.15rem 0.5rem' }} onClick={() => setQty(s.subcategory_id, getQty(s.subcategory_id) + 1)}>+</button>
                   </div>
-                  <button className="pf-link-btn" style={{ fontSize: '0.85rem' }} onClick={() => setSpecsFor(s)}>Create Specs</button>
+                  <button className="pf-link-btn" style={{ fontSize: '0.85rem' }} onClick={() => setSpecsFor(s)}>
+                    {isQuoteOnlyCategory(s.category_id) ? 'Request Quotation' : 'Create Specs'}
+                  </button>
                 </div>
               </div>
             ))}

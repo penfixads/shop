@@ -1,3 +1,23 @@
+// Categories whose pricing is deliberately NOT shown on the public shop —
+// signage jobs are quoted per project (materials, site conditions, install),
+// and publishing per-sqft rates would hand competitors our pricing basis.
+// Their catalog cards show "Request Quotation" instead of a price, the specs
+// modal collects requirements without any peso amounts, and submitJobOrder
+// stores the items at ₱0 flagged [FOR QUOTATION] for staff to price in
+// penfixads-OS.
+export const QUOTE_ONLY_CATEGORY_IDS = new Set(['CAT_SGL', 'CAT_SNL'])
+
+export function isQuoteOnlyCategory(categoryId: string | null | undefined): boolean {
+  return !!categoryId && QUOTE_ONLY_CATEGORY_IDS.has(categoryId)
+}
+
+// Quote-only cards still show a ballpark rate, but phrased "Starts at ₱X / sqft"
+// instead of "From ₱X / sqft" — it's a floor for the client's expectations, not
+// the basis of the final price (that comes from the staff-prepared quotation).
+export function formatStartsAtLabel(pricingModel: string, basePrice: number, unit?: string | null): string {
+  return formatPriceLabel(pricingModel, basePrice, unit).replace(/^From /, 'Starts at ')
+}
+
 // Turns a subcategory's pricing_model + base_price into the short label
 // shown on its catalog card, e.g. "From ₱12.00 / sq ft". Each pricing model
 // implies a different unit — see lib/jo-helpers.ts's computeLineTotal in

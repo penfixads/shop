@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { computeLineTotal, formatPeso, linearUnitLabel, PRICING_LABELS } from '@/lib/pricing'
+import { computeLineTotal, formatPeso, linearUnitLabel, PRICING_LABELS, isQuoteOnlyCategory } from '@/lib/pricing'
 import { compressImageToDataUrl } from '@/lib/image'
 import { uploadOriginalFile } from './actions'
 
@@ -37,6 +37,9 @@ export interface DraftItem {
   needs_layout_help: boolean
   layout_fee: number
   line_total: number
+  // Signage categories are quoted per project — no pricing is shown in the shop
+  // and the item lands at ₱0 flagged [FOR QUOTATION] for staff to price.
+  quote_only: boolean
 }
 
 interface Subcategory {
@@ -78,6 +81,7 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
 
   const pricingModel = subcategory.pricing_model
   const basePrice = subcategory.base_price
+  const quoteOnly = isQuoteOnlyCategory(subcategory.category_id)
 
   const needsDims = ['area', 'dimension', 'area_cube', 'per_lettersqft'].includes(pricingModel)
   const needsDepth = pricingModel === 'area_cube'
@@ -96,8 +100,8 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
     0,
   ), [pricingModel, basePrice, width, height, depth, quantity, noOfMins, letterCount])
 
-  const layoutFee = needsLayoutHelp ? LAYOUT_FEE : 0
-  const lineTotal = itemTotal + layoutFee
+  const layoutFee = needsLayoutHelp && !quoteOnly ? LAYOUT_FEE : 0
+  const lineTotal = quoteOnly ? 0 : itemTotal + layoutFee
 
   async function handlePreviewFile(file: File | null) {
     if (!file) return
@@ -159,6 +163,7 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
       needs_layout_help: needsLayoutHelp,
       layout_fee: layoutFee,
       line_total: lineTotal,
+      quote_only: quoteOnly,
     })
   }
 
@@ -166,20 +171,29 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
     <div className="pf-modal-overlay" style={{ zIndex: 200, alignItems: 'flex-start' }}>
       <div className="pf-modal-card pf-modal-wine" style={{ maxWidth: 580, marginTop: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-          <h3 style={{ color: '#fff', fontWeight: 700, fontSize: '1.7rem' }}>Create Specification</h3>
+          <h3 style={{ color: '#fff', fontWeight: 700, fontSize: '1.7rem' }}>{quoteOnly ? 'Request for Quotation' : 'Create Specification'}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#E8B9C6', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
         </div>
         <p style={{ color: '#E8B9C6', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
           {subcategory.subcategory_name} · {subcategory.category_name}
         </p>
 
-        <div className="pf-field">
-          <label className="pf-label">Pricing Model</label>
-          <input type="text" value={PRICING_LABELS[pricingModel] || pricingModel} disabled className="pf-input" />
-        </div>
+        {quoteOnly ? (
+          <div style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 8, padding: '0.6rem 0.75rem', marginBottom: '1rem', color: '#C9A84C', fontSize: '0.78rem', lineHeight: 1.5 }}>
+            Signage projects are priced per project — the rate shown is only a starting point,
+            and the final price depends on materials, size, and installation. Fill in your
+            specifics below and our team will prepare a proper quotation for you — no payment
+            is due until you approve it.
+          </div>
+        ) : (
+          <div className="pf-field">
+            <label className="pf-label">Pricing Model</label>
+            <input type="text" value={PRICING_LABELS[pricingModel] || pricingModel} disabled className="pf-input" />
+          </div>
+        )}
 
         <div className="pf-field">
-          <label className="pf-label">Item Preview</label>
+          <label className="pf-label">{quoteOnly ? 'Reference Image' : 'Item Preview'}</label>
           {preview ? (
             <div onPaste={handlePreviewPaste} tabIndex={0} style={{ display: 'flex', alignItems: 'center', gap: 12, outline: 'none' }}>
               <img
@@ -204,7 +218,11 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
             <div onPaste={handlePreviewPaste} tabIndex={0} style={{ border: '1.5px dashed rgba(255,255,255,0.3)', borderRadius: 8, padding: '0.6rem 0.75rem', outline: 'none' }}>
               <input type="file" accept="image/*" onChange={e => handlePreviewFile(e.target.files?.[0] || null)} className="pf-input" style={{ border: 'none', padding: 0 }} />
               <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>
-                Optional — <b>upload</b> the actual file you want printed, or <b>paste (Ctrl+V)</b> a reference/mockup image if you're just showing us the layout idea you want.
+                {quoteOnly ? (
+                  <>Optional — <b>upload</b> or <b>paste (Ctrl+V)</b> an image of the signage you want (a photo, sketch, or sample). Our team will use it as the reference for the design to be printed/fabricated and for preparing your quotation.</>
+                ) : (
+                  <>Optional — <b>upload</b> the actual file you want printed, or <b>paste (Ctrl+V)</b> a reference/mockup image if you&apos;re just showing us the layout idea you want.</>
+                )}
               </div>
             </div>
           )}
@@ -221,11 +239,13 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
         <div className="pf-field">
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
             <input type="checkbox" checked={needsLayoutHelp} onChange={e => setNeedsLayoutHelp(e.target.checked)} style={{ accentColor: '#C9A84C', width: 15, height: 15 }} />
-            <span style={{ color: '#fff', fontSize: '0.85rem' }}>I need help with layout/design (+{formatPeso(LAYOUT_FEE)})</span>
+            <span style={{ color: '#fff', fontSize: '0.85rem' }}>I need help with layout/design{quoteOnly ? '' : ` (+${formatPeso(LAYOUT_FEE)})`}</span>
           </label>
-          <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>
-            {formatPeso(LAYOUT_FEE)} is a starting estimate — the actual layout fee can be lower or higher depending on how complex your design turns out to be. Our team will confirm the final amount with you before starting.
-          </div>
+          {!quoteOnly && (
+            <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>
+              {formatPeso(LAYOUT_FEE)} is a starting estimate — the actual layout fee can be lower or higher depending on how complex your design turns out to be. Our team will confirm the final amount with you before starting.
+            </div>
+          )}
           {needsLayoutHelp && originalFileName && (
             <div style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 8, padding: '0.6rem 0.75rem', marginTop: 8, color: '#C9A84C', fontSize: '0.72rem' }}>
               Since you're asking for layout help, we'll treat <b>{originalFileName}</b> as a reference for the look you want — not the final file to print. Our design team will create the layout around it and confirm with you before production.
@@ -233,11 +253,13 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
           )}
         </div>
 
-        <div className="pf-grid-2" style={{ marginBottom: '0.85rem' }}>
-          <div>
-            <label className="pf-label">Base Price (₱)</label>
-            <input type="text" value={basePrice.toFixed(2)} disabled className="pf-input" />
-          </div>
+        <div className={quoteOnly ? 'pf-field' : 'pf-grid-2'} style={quoteOnly ? undefined : { marginBottom: '0.85rem' }}>
+          {!quoteOnly && (
+            <div>
+              <label className="pf-label">Base Price (₱)</label>
+              <input type="text" value={basePrice.toFixed(2)} disabled className="pf-input" />
+            </div>
+          )}
           <div>
             <label className="pf-label">Quantity</label>
             <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" className="pf-input" />
@@ -292,30 +314,32 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
           <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" className="pf-input" />
         </div>
 
-        <div className="pf-totals-box">
-          {needsLayoutHelp && (
-            <>
-              <div className="pf-totals-row">
-                <span>Item Subtotal</span>
-                <span>{formatPeso(itemTotal)}</span>
-              </div>
-              <div className="pf-totals-row">
-                <span>Layout Fee</span>
-                <span>{formatPeso(layoutFee)}</span>
-              </div>
-            </>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#000', fontSize: '0.82rem' }}>Line Total</span>
-            <span style={{ color: '#000', fontWeight: 700, fontSize: '1rem' }}>{formatPeso(lineTotal)}</span>
+        {!quoteOnly && (
+          <div className="pf-totals-box">
+            {needsLayoutHelp && (
+              <>
+                <div className="pf-totals-row">
+                  <span>Item Subtotal</span>
+                  <span>{formatPeso(itemTotal)}</span>
+                </div>
+                <div className="pf-totals-row">
+                  <span>Layout Fee</span>
+                  <span>{formatPeso(layoutFee)}</span>
+                </div>
+              </>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#000', fontSize: '0.82rem' }}>Line Total</span>
+              <span style={{ color: '#000', fontWeight: 700, fontSize: '1rem' }}>{formatPeso(lineTotal)}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {formError && <div style={{ color: '#e74c3c', fontSize: '0.82rem', marginTop: '0.75rem', textAlign: 'right' }}>{formError}</div>}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: '1rem' }}>
           <button onClick={onClose} className="pf-btn pf-btn-secondary">Cancel</button>
-          <button onClick={handleAdd} disabled={compressing || uploadingOriginal} className="pf-btn">Add to Job Order</button>
+          <button onClick={handleAdd} disabled={compressing || uploadingOriginal} className="pf-btn">{quoteOnly ? 'Add Quotation Request' : 'Add to Job Order'}</button>
         </div>
       </div>
     </div>

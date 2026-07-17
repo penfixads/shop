@@ -2,7 +2,7 @@
 
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { generateClientId, generateJobOrderId, generateItemId, getNextJOSequence } from '@/lib/ids'
-import { computeLineTotal } from '@/lib/pricing'
+import { computeLineTotal, isQuoteOnlyCategory } from '@/lib/pricing'
 import { extractClientIdFromQr } from '@/lib/qr'
 import { getPhilippineDateStr } from '@/lib/date'
 import type { DraftItem } from './CreateSpecsModal'
@@ -144,10 +144,30 @@ export async function submitJobOrder(data: {
   const { data: client } = await admin.from('clients').select('client_id').eq('client_id', data.clientId).maybeSingle()
   if (!client) return { success: false, message: 'Client not found — please scan your QR again.' }
 
+  // Quote-only status is decided server-side from the subcategory's real category —
+  // the browser's own quote_only flag is display-only and never trusted, otherwise a
+  // tampered cart could submit any priced item at ₱0 by flagging it "for quotation".
+  const subIds = Array.from(new Set(data.items.map(i => i.subcategory_id)))
+  const { data: subRows } = await admin
+    .from('subcategories')
+    .select('subcategory_id, category_id')
+    .in('subcategory_id', subIds)
+  const quoteOnlySubs = new Set(
+    (subRows || []).filter(r => isQuoteOnlyCategory(r.category_id)).map(r => r.subcategory_id)
+  )
+
   // Never trust the browser's own line_total — recompute every item's price
   // server-side from its stored pricing model so a tampered cart can't submit a
-  // real job order at the wrong price.
+  // real job order at the wrong price. Quote-only (signage) items land at ₱0 with
+  // a [FOR QUOTATION] marker; staff price them in penfixads-OS before payment.
   const recomputedItems = data.items.map(item => {
+    if (quoteOnlySubs.has(item.subcategory_id)) {
+      return {
+        ...item,
+        computed_line_total: 0,
+        notes: `[FOR QUOTATION]${item.needs_layout_help ? ' (needs layout/design help)' : ''}${item.notes ? ' ' + item.notes : ''}`,
+      }
+    }
     const base = computeLineTotal(
       item.pricing_model,
       item.base_price,

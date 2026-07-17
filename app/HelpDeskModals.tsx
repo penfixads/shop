@@ -385,6 +385,7 @@ type CheckoutStep = 'cart' | 'register' | 'confirm' | 'done'
 
 export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftItem[]; onClose: () => void; onOrderPlaced: () => void }) {
   const grandTotal = cart.reduce((sum, item) => sum + item.line_total, 0)
+  const hasQuoteItems = cart.some(item => item.quote_only)
   const [step, setStep] = useState<CheckoutStep>('cart')
   const [client, setClient] = useState<{ clientId: string; clientName: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -477,10 +478,15 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
       <HelpDeskModal title="Confirm Order" avatar={PenfixLogoAvatar} onClose={onClose} anchor="top">
         <p style={{ color: '#666', fontSize: '0.82rem', marginBottom: '1rem' }}>Checking out as:</p>
         <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2a2426', marginBottom: '1.25rem' }}>{client.clientName}</p>
-        <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.85rem', marginBottom: '1rem', borderBottom: '1px solid #eee1d6' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: hasQuoteItems ? '0.4rem' : '0.85rem', marginBottom: hasQuoteItems ? 0 : '1rem', borderBottom: hasQuoteItems ? 'none' : '1px solid #eee1d6' }}>
           <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#2a2426' }}>Total</span>
           <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#7A1828' }}>{formatPeso(grandTotal)}</span>
         </div>
+        {hasQuoteItems && (
+          <p style={{ fontSize: '0.75rem', color: '#999', paddingBottom: '0.85rem', marginBottom: '1rem', borderBottom: '1px solid #eee1d6' }}>
+            Plus quotation item(s) — we&apos;ll send you their price after reviewing your specs.
+          </p>
+        )}
         {submitError && <p style={{ color: '#c0392b', fontSize: '0.8rem', marginBottom: '1rem' }}>{submitError}</p>}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button onClick={() => { setStep('cart'); setClient(null) }} className="pf-link-btn" style={{ fontSize: '0.85rem' }} disabled={submitting}>Not you?</button>
@@ -502,15 +508,22 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
             <div key={item.key} style={{ borderBottom: '1px solid #eee1d6', padding: '0.75rem 0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                 <span style={{ fontWeight: 600, fontSize: '0.85rem', color: '#2a2426' }}>{item.subcategory_name}</span>
-                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2a2426', whiteSpace: 'nowrap' }}>{formatPeso(item.line_total)}</span>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: item.quote_only ? '#7A1828' : '#2a2426', whiteSpace: 'nowrap' }}>
+                  {item.quote_only ? 'For Quotation' : formatPeso(item.line_total)}
+                </span>
               </div>
               <div style={{ fontSize: '0.75rem', color: '#999' }}>{item.category_name} · Qty {item.quantity}</div>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem 0', marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem 0', marginBottom: hasQuoteItems ? 0 : '0.5rem' }}>
             <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#2a2426' }}>Total</span>
             <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#7A1828' }}>{formatPeso(grandTotal)}</span>
           </div>
+          {hasQuoteItems && (
+            <p style={{ fontSize: '0.75rem', color: '#999', marginBottom: '0.5rem' }}>
+              Quotation items aren't included in the total — our team will send you their price after reviewing your specs.
+            </p>
+          )}
           <button onClick={handleCheckout} className="pf-btn" style={{ width: '100%', justifyContent: 'center' }}>Checkout</button>
         </>
       )}
