@@ -75,10 +75,18 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
   // The grid uses auto-fill columns, so the actual column count depends on
   // viewport width. Read it back from the rendered grid so "3 rows" means
   // 3 rows regardless of how many columns fit.
+  //
+  // The grid element is conditionally rendered (replaced by "No services found"
+  // when a category/search has no items), so this effect must re-attach to the
+  // NEW grid node whenever it remounts — with mount-only deps, the observer kept
+  // watching the removed node, whose final detached measurement (computed style
+  // reads as empty → 1 column) locked every later category at 3 items per page.
+  const hasItems = filtered.length > 0
   useLayoutEffect(() => {
     const el = gridRef.current
     if (!el) return
     const measure = () => {
+      if (!el.isConnected) return
       const count = getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length
       setColumns(Math.max(1, count))
     }
@@ -86,7 +94,7 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [hasItems])
 
   const itemsPerPage = columns * 3
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
