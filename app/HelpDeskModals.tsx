@@ -131,8 +131,8 @@ const REGISTRATION_FIELDS: FieldSpec[] = [
   { icon: '🔒', placeholder: 'Password (min. 6 characters)', type: 'password' },
   { icon: '👤', placeholder: 'Customer Name — Full Name' },
   { icon: '✉️', placeholder: 'Email (optional)' },
-  { icon: '💬', placeholder: 'Messenger (optional)' },
-  { icon: '📞', placeholder: 'Viber (optional)' },
+  { icon: '💬', placeholder: 'Messenger (Messenger or Viber required)' },
+  { icon: '📞', placeholder: 'Viber (Messenger or Viber required)' },
   { icon: '📲', placeholder: 'WhatsApp (optional)' },
 ]
 
@@ -144,10 +144,16 @@ export function RegistrationModal({ onClose }: { onClose: () => void }) {
   const [values, setValues] = useState<Record<number, string>>({ 2: stored?.clientName ?? '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [needsConfirm, setNeedsConfirm] = useState(false)
   const [saved, setSaved] = useState<{ clientId: string; clientName: string; returning: boolean } | null>(null)
 
-  async function handleSave() {
+  async function handleSave(confirmNew = false) {
     setError('')
+    if (!(values[4] ?? '').trim() && !(values[5] ?? '').trim()) {
+      setError('Please provide at least a Messenger or Viber account.')
+      setNeedsConfirm(false)
+      return
+    }
     setSaving(true)
     const result = await registerClient({
       contactNumber: values[0] ?? '',
@@ -157,9 +163,15 @@ export function RegistrationModal({ onClose }: { onClose: () => void }) {
       messenger: values[4] ?? '',
       viber: values[5] ?? '',
       whatsapp: values[6] ?? '',
+      confirmNew,
     })
     setSaving(false)
-    if (!result.success) { setError(result.message); return }
+    if (!result.success) {
+      setError(result.message)
+      setNeedsConfirm(!!result.possibleDuplicate)
+      return
+    }
+    setNeedsConfirm(false)
     localStorage.setItem(STORED_CLIENT_KEY, JSON.stringify({ clientId: result.clientId, clientName: result.clientName }))
     setSaved({ clientId: result.clientId, clientName: result.clientName, returning: result.returning })
   }
@@ -201,8 +213,13 @@ export function RegistrationModal({ onClose }: { onClose: () => void }) {
         </div>
       ))}
       {error && <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.75rem' }}>{error}</p>}
+      {needsConfirm && (
+        <button onClick={() => handleSave(true)} disabled={saving} className="pf-link-btn" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
+          This is a new account — continue registering
+        </button>
+      )}
       <button
-        onClick={handleSave}
+        onClick={() => handleSave(false)}
         disabled={saving}
         className="pf-btn"
         style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }}
@@ -398,6 +415,7 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
   const [registerValues, setRegisterValues] = useState<Record<number, string>>({})
   const [registering, setRegistering] = useState(false)
   const [registerError, setRegisterError] = useState('')
+  const [registerNeedsConfirm, setRegisterNeedsConfirm] = useState(false)
   // handleCheckout only routes here when getStoredClient() is empty, i.e. this
   // browser doesn't already know the client — could be a returning client on a
   // new device just as easily as someone brand new. Default to login first
@@ -416,8 +434,13 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
     setStep('confirm')
   }
 
-  async function handleRegisterAndCheckout() {
+  async function handleRegisterAndCheckout(confirmNew = false) {
     setRegisterError('')
+    if (!(registerValues[4] ?? '').trim() && !(registerValues[5] ?? '').trim()) {
+      setRegisterError('Please provide at least a Messenger or Viber account.')
+      setRegisterNeedsConfirm(false)
+      return
+    }
     setRegistering(true)
     const result = await registerClient({
       contactNumber: registerValues[0] ?? '',
@@ -427,9 +450,15 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
       messenger: registerValues[4] ?? '',
       viber: registerValues[5] ?? '',
       whatsapp: registerValues[6] ?? '',
+      confirmNew,
     })
     setRegistering(false)
-    if (!result.success) { setRegisterError(result.message); return }
+    if (!result.success) {
+      setRegisterError(result.message)
+      setRegisterNeedsConfirm(!!result.possibleDuplicate)
+      return
+    }
+    setRegisterNeedsConfirm(false)
     localStorage.setItem(STORED_CLIENT_KEY, JSON.stringify({ clientId: result.clientId, clientName: result.clientName }))
     setClient({ clientId: result.clientId, clientName: result.clientName })
     setStep('confirm')
@@ -531,14 +560,21 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
           </div>
         ))}
         {registerError && <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.75rem' }}>{registerError}</p>}
+        {registerNeedsConfirm && (
+          <p style={{ textAlign: 'center', marginTop: '0.4rem' }}>
+            <button onClick={() => handleRegisterAndCheckout(true)} disabled={registering} className="pf-link-btn" style={{ fontSize: '0.8rem' }}>
+              This is a new account — continue registering
+            </button>
+          </p>
+        )}
         <p style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <button onClick={() => { setAuthMode('login'); setRegisterError('') }} className="pf-link-btn" style={{ fontSize: '0.8rem' }}>
+          <button onClick={() => { setAuthMode('login'); setRegisterError(''); setRegisterNeedsConfirm(false) }} className="pf-link-btn" style={{ fontSize: '0.8rem' }}>
             Already registered? Log in instead
           </button>
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
           <button onClick={() => setStep('cart')} className="pf-link-btn" style={{ fontSize: '0.85rem' }} disabled={registering}>← Back to cart</button>
-          <button onClick={handleRegisterAndCheckout} disabled={registering} className="pf-btn" style={{ flex: 1, justifyContent: 'center' }}>
+          <button onClick={() => handleRegisterAndCheckout(false)} disabled={registering} className="pf-btn" style={{ flex: 1, justifyContent: 'center' }}>
             {registering ? 'Saving…' : 'Register & Continue'}
           </button>
         </div>

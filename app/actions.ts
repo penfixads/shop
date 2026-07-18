@@ -6,11 +6,12 @@ import { generateClientId, generateJobOrderId, generateItemId, getNextJOSequence
 import { computeLineTotal, isQuoteOnlyCategory } from '@/lib/pricing'
 import { extractClientIdFromQr } from '@/lib/qr'
 import { getPhilippineDateStr } from '@/lib/date'
+import { findLikelyDuplicateClients, normalizeContact } from '@/lib/client-dedupe'
 import type { DraftItem } from './CreateSpecsModal'
 
 type ActionResult =
   | { success: true; clientId: string; clientName: string; returning: boolean }
-  | { success: false; message: string }
+  | { success: false; message: string; possibleDuplicate?: boolean }
 
 export async function registerClient(data: {
   contactNumber: string
@@ -20,6 +21,10 @@ export async function registerClient(data: {
   messenger: string
   viber: string
   whatsapp: string
+  // Set once the client has been warned about a likely-duplicate name match
+  // (different/no contact info) and chosen to proceed anyway — see the
+  // fuzzy-match block below.
+  confirmNew?: boolean
 }): Promise<ActionResult> {
   const contactNumber = data.contactNumber.trim()
   const clientName = data.clientName.trim()
@@ -27,27 +32,54 @@ export async function registerClient(data: {
   if (!contactNumber) return { success: false, message: 'Mobile number is required.' }
   if (!clientName) return { success: false, message: 'Customer name is required.' }
   if (!password || password.length < 6) return { success: false, message: 'Password must be at least 6 characters.' }
+  if (!data.messenger.trim() && !data.viber.trim()) return { success: false, message: 'Please provide at least a Messenger or Viber account.' }
 
   const admin = createSupabaseAdminClient()
 
-  // Same phone number registering again — treat as a returning visitor
-  // instead of creating a duplicate client record.
-  const { data: existing } = await admin
+  // Compare against every existing client (normalized contact/email first, then
+  // fuzzy name) so a client re-registering with a slightly different phone format
+  // ("0917-123-4567" vs "639171234567") — or one staff already entered manually
+  // for a walk-in JO — doesn't end up with a second, disconnected record.
+  const { data: allClients } = await admin
     .from('clients')
-    .select('client_id, client_name, password_hash')
-    .eq('contact_number', contactNumber)
-    .maybeSingle()
-  if (existing) {
-    // Backfill a password for pre-existing clients (e.g. staff-created in
-    // penfixads-OS, or registered before login existed) the first time they
-    // come through here — but never silently overwrite one that's already
-    // set, since that would let anyone hijack an account just by knowing
-    // the phone number.
+    .select('client_id, client_name, company_name, contact_number, email, password_hash')
+  const matches = findLikelyDuplicateClients(clientName, null, allClients || [], {
+    contactNumber,
+    email: data.email.trim() || undefined,
+  })
+
+  const contactMatch = matches.find(m => m.reason === 'contact')
+  if (contactMatch) {
+    const existing = allClients!.find(c => c.client_id === contactMatch.client.client_id)!
+    // Same phone/email already on file — treat as a returning client instead of
+    // creating a duplicate. Backfill a password for pre-existing clients (e.g.
+    // staff-created in penfixads-OS, or registered before login existed) the
+    // first time they come through here — but never silently overwrite one
+    // that's already set, and never log someone in without checking it, since
+    // that would let anyone hijack an account just by knowing the phone number.
     if (!existing.password_hash) {
       const password_hash = await bcrypt.hash(password, 10)
       await admin.from('clients').update({ password_hash }).eq('client_id', existing.client_id)
+      return { success: true, clientId: existing.client_id, clientName: existing.client_name || clientName, returning: true }
     }
-    return { success: true, clientId: existing.client_id, clientName: existing.client_name, returning: true }
+    const passwordMatches = await bcrypt.compare(password, existing.password_hash)
+    if (!passwordMatches) {
+      return { success: false, message: 'This mobile number is already registered. Please use "Log In" instead, or contact us if you forgot your password.' }
+    }
+    return { success: true, clientId: existing.client_id, clientName: existing.client_name || clientName, returning: true }
+  }
+
+  // No contact/email match, but the name looks like an existing (likely
+  // staff-entered) client under a different or missing phone number. Don't
+  // expose any of that other client's details to a stranger typing a similar
+  // name — just pause once for a plain yes/no; confirmNew lets them proceed
+  // if they're sure this is genuinely a new registration.
+  if (matches.length > 0 && !data.confirmNew) {
+    return {
+      success: false,
+      possibleDuplicate: true,
+      message: 'It looks like you may already have an account with us. If you’ve ordered here before (even in-store), please try "Log In" first or contact our staff to link your history. Otherwise, you can continue registering as new.',
+    }
   }
 
   const clientId = generateClientId()
@@ -80,11 +112,14 @@ export async function loginClient(data: { contactNumber: string; password: strin
   if (!contactNumber || !data.password) return { success: false, message: 'Mobile number and password are required.' }
 
   const admin = createSupabaseAdminClient()
-  const { data: client } = await admin
+  // Normalized comparison (not a raw .eq()) so a client who registered as
+  // "0917-123-4567" can still log in typing "09171234567" — same drift
+  // registerClient now guards against on the way in.
+  const normInput = normalizeContact(contactNumber)
+  const { data: candidates } = await admin
     .from('clients')
-    .select('client_id, client_name, password_hash')
-    .eq('contact_number', contactNumber)
-    .maybeSingle()
+    .select('client_id, client_name, password_hash, contact_number')
+  const client = (candidates || []).find(c => normalizeContact(c.contact_number) === normInput) || null
 
   if (!client || !client.password_hash) {
     return { success: false, message: "We couldn't find an account with that mobile number. Please register first." }
