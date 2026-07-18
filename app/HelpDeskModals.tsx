@@ -398,11 +398,12 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
   const [registerValues, setRegisterValues] = useState<Record<number, string>>({})
   const [registering, setRegistering] = useState(false)
   const [registerError, setRegisterError] = useState('')
-  // Registering only ever happens on a browser that doesn't already know this
-  // client (handleCheckout only routes here when getStoredClient() is empty),
-  // so the alternative here is specifically "returning client, new device" —
-  // login, not registration.
-  const [authMode, setAuthMode] = useState<'register' | 'login'>('register')
+  // handleCheckout only routes here when getStoredClient() is empty, i.e. this
+  // browser doesn't already know the client — could be a returning client on a
+  // new device just as easily as someone brand new. Default to login first
+  // (the common case for a repeat customer), with a toggle to register for
+  // anyone who doesn't have an account yet.
+  const [authMode, setAuthMode] = useState<'register' | 'login'>('login')
   const [loginMobile, setLoginMobile] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
