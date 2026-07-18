@@ -1,9 +1,9 @@
-import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { getBannerImageMap } from '@/lib/banners'
 import ShopClient from './ShopClient'
 
 export default async function HomePage() {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseAdminClient()
 
   const [{ data: categories }, { data: subcategories }] = await Promise.all([
     supabase.from('categories').select('category_id, category_name').eq('is_active', true).order('category_name'),
