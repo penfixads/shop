@@ -1,5 +1,6 @@
 'use server'
 
+import bcrypt from 'bcryptjs'
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { generateClientId, generateJobOrderId, generateItemId, getNextJOSequence } from '@/lib/ids'
 import { computeLineTotal, isQuoteOnlyCategory } from '@/lib/pricing'
@@ -13,6 +14,7 @@ type ActionResult =
 
 export async function registerClient(data: {
   contactNumber: string
+  password: string
   clientName: string
   email: string
   messenger: string
@@ -21,8 +23,10 @@ export async function registerClient(data: {
 }): Promise<ActionResult> {
   const contactNumber = data.contactNumber.trim()
   const clientName = data.clientName.trim()
+  const password = data.password
   if (!contactNumber) return { success: false, message: 'Mobile number is required.' }
   if (!clientName) return { success: false, message: 'Customer name is required.' }
+  if (!password || password.length < 6) return { success: false, message: 'Password must be at least 6 characters.' }
 
   const admin = createSupabaseAdminClient()
 
@@ -30,19 +34,30 @@ export async function registerClient(data: {
   // instead of creating a duplicate client record.
   const { data: existing } = await admin
     .from('clients')
-    .select('client_id, client_name')
+    .select('client_id, client_name, password_hash')
     .eq('contact_number', contactNumber)
     .maybeSingle()
   if (existing) {
+    // Backfill a password for pre-existing clients (e.g. staff-created in
+    // penfixads-OS, or registered before login existed) the first time they
+    // come through here — but never silently overwrite one that's already
+    // set, since that would let anyone hijack an account just by knowing
+    // the phone number.
+    if (!existing.password_hash) {
+      const password_hash = await bcrypt.hash(password, 10)
+      await admin.from('clients').update({ password_hash }).eq('client_id', existing.client_id)
+    }
     return { success: true, clientId: existing.client_id, clientName: existing.client_name, returning: true }
   }
 
   const clientId = generateClientId()
+  const password_hash = await bcrypt.hash(password, 10)
   const { error } = await admin.from('clients').insert({
     client_id: clientId,
     client_type: 'Individual',
     client_name: clientName,
     contact_number: contactNumber,
+    password_hash,
     email: data.email.trim() || null,
     messenger: data.messenger.trim() || null,
     viber: data.viber.trim() || null,
@@ -51,6 +66,33 @@ export async function registerClient(data: {
   if (error) return { success: false, message: error.message }
 
   return { success: true, clientId, clientName, returning: false }
+}
+
+type LoginResult =
+  | { success: true; clientId: string; clientName: string }
+  | { success: false; message: string }
+
+// Lets a returning client identify themselves on a device/browser that
+// doesn't already have them in localStorage — the counterpart to
+// registerClient's "remember this browser" shortcut for new sign-ups.
+export async function loginClient(data: { contactNumber: string; password: string }): Promise<LoginResult> {
+  const contactNumber = data.contactNumber.trim()
+  if (!contactNumber || !data.password) return { success: false, message: 'Mobile number and password are required.' }
+
+  const admin = createSupabaseAdminClient()
+  const { data: client } = await admin
+    .from('clients')
+    .select('client_id, client_name, password_hash')
+    .eq('contact_number', contactNumber)
+    .maybeSingle()
+
+  if (!client || !client.password_hash) {
+    return { success: false, message: "We couldn't find an account with that mobile number. Please register first." }
+  }
+  const valid = await bcrypt.compare(data.password, client.password_hash)
+  if (!valid) return { success: false, message: 'Incorrect password.' }
+
+  return { success: true, clientId: client.client_id, clientName: client.client_name }
 }
 
 type RewardsResult =

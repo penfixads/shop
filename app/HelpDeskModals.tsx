@@ -5,7 +5,7 @@ import Image from 'next/image'
 import jsQR from 'jsqr'
 import { formatPeso } from '@/lib/pricing'
 import type { DraftItem } from './CreateSpecsModal'
-import { registerClient, getClientRewards, lookupClientForCheckout, submitJobOrder } from './actions'
+import { registerClient, loginClient, getClientRewards, lookupClientForCheckout, submitJobOrder } from './actions'
 import ClientQrCode from '@/components/ClientQrCode'
 
 async function decodeQrFromFile(file: File): Promise<string | null> {
@@ -123,10 +123,12 @@ const PenfixLogoAvatar = (
 interface FieldSpec {
   icon: string
   placeholder: string
+  type?: string
 }
 
 const REGISTRATION_FIELDS: FieldSpec[] = [
   { icon: '📱', placeholder: 'Mobile No. (PH) — 09xxxxxxxxx' },
+  { icon: '🔒', placeholder: 'Password (min. 6 characters)', type: 'password' },
   { icon: '👤', placeholder: 'Customer Name — Full Name' },
   { icon: '✉️', placeholder: 'Email (optional)' },
   { icon: '💬', placeholder: 'Messenger (optional)' },
@@ -134,12 +136,12 @@ const REGISTRATION_FIELDS: FieldSpec[] = [
   { icon: '📲', placeholder: 'WhatsApp (optional)' },
 ]
 
-// Field order is fixed and mapped by index below (0=mobile, 1=name,
-// 2=email, 3=messenger, 4=viber, 5=whatsapp) — keep REGISTRATION_FIELDS and
-// the registerClient() call in sync if this ever changes.
+// Field order is fixed and mapped by index below (0=mobile, 1=password,
+// 2=name, 3=email, 4=messenger, 5=viber, 6=whatsapp) — keep
+// REGISTRATION_FIELDS and the registerClient() call in sync if this ever changes.
 export function RegistrationModal({ onClose }: { onClose: () => void }) {
   const stored = getStoredClient()
-  const [values, setValues] = useState<Record<number, string>>({ 1: stored?.clientName ?? '' })
+  const [values, setValues] = useState<Record<number, string>>({ 2: stored?.clientName ?? '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState<{ clientId: string; clientName: string; returning: boolean } | null>(null)
@@ -149,11 +151,12 @@ export function RegistrationModal({ onClose }: { onClose: () => void }) {
     setSaving(true)
     const result = await registerClient({
       contactNumber: values[0] ?? '',
-      clientName: values[1] ?? '',
-      email: values[2] ?? '',
-      messenger: values[3] ?? '',
-      viber: values[4] ?? '',
-      whatsapp: values[5] ?? '',
+      password: values[1] ?? '',
+      clientName: values[2] ?? '',
+      email: values[3] ?? '',
+      messenger: values[4] ?? '',
+      viber: values[5] ?? '',
+      whatsapp: values[6] ?? '',
     })
     setSaving(false)
     if (!result.success) { setError(result.message); return }
@@ -189,6 +192,7 @@ export function RegistrationModal({ onClose }: { onClose: () => void }) {
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderBottom: '1px solid #eee1d6', padding: '0.7rem 0' }}>
           <span style={{ fontSize: '1rem' }}>{f.icon}</span>
           <input
+            type={f.type ?? 'text'}
             value={values[i] ?? ''}
             onChange={e => setValues(prev => ({ ...prev, [i]: e.target.value }))}
             placeholder={f.placeholder}
@@ -394,6 +398,15 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
   const [registerValues, setRegisterValues] = useState<Record<number, string>>({})
   const [registering, setRegistering] = useState(false)
   const [registerError, setRegisterError] = useState('')
+  // Registering only ever happens on a browser that doesn't already know this
+  // client (handleCheckout only routes here when getStoredClient() is empty),
+  // so the alternative here is specifically "returning client, new device" —
+  // login, not registration.
+  const [authMode, setAuthMode] = useState<'register' | 'login'>('register')
+  const [loginMobile, setLoginMobile] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
+  const [loginError, setLoginError] = useState('')
 
   function handleCheckout() {
     const stored = getStoredClient()
@@ -407,14 +420,26 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
     setRegistering(true)
     const result = await registerClient({
       contactNumber: registerValues[0] ?? '',
-      clientName: registerValues[1] ?? '',
-      email: registerValues[2] ?? '',
-      messenger: registerValues[3] ?? '',
-      viber: registerValues[4] ?? '',
-      whatsapp: registerValues[5] ?? '',
+      password: registerValues[1] ?? '',
+      clientName: registerValues[2] ?? '',
+      email: registerValues[3] ?? '',
+      messenger: registerValues[4] ?? '',
+      viber: registerValues[5] ?? '',
+      whatsapp: registerValues[6] ?? '',
     })
     setRegistering(false)
     if (!result.success) { setRegisterError(result.message); return }
+    localStorage.setItem(STORED_CLIENT_KEY, JSON.stringify({ clientId: result.clientId, clientName: result.clientName }))
+    setClient({ clientId: result.clientId, clientName: result.clientName })
+    setStep('confirm')
+  }
+
+  async function handleLogin() {
+    setLoginError('')
+    setLoggingIn(true)
+    const result = await loginClient({ contactNumber: loginMobile, password: loginPassword })
+    setLoggingIn(false)
+    if (!result.success) { setLoginError(result.message); return }
     localStorage.setItem(STORED_CLIENT_KEY, JSON.stringify({ clientId: result.clientId, clientName: result.clientName }))
     setClient({ clientId: result.clientId, clientName: result.clientName })
     setStep('confirm')
@@ -445,6 +470,47 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
     )
   }
 
+  if (step === 'register' && authMode === 'login') {
+    return (
+      <HelpDeskModal title="Log In" avatar={PenfixLogoAvatar} onClose={onClose} anchor="top">
+        <p style={{ color: '#666', fontSize: '0.82rem', textAlign: 'center', marginBottom: '1.25rem' }}>
+          Welcome back — log in to continue your order.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderBottom: '1px solid #eee1d6', padding: '0.7rem 0' }}>
+          <span style={{ fontSize: '1rem' }}>📱</span>
+          <input
+            value={loginMobile}
+            onChange={e => setLoginMobile(e.target.value)}
+            placeholder="Mobile No. (PH) — 09xxxxxxxxx"
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: '0.85rem', color: '#2a2426' }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderBottom: '1px solid #eee1d6', padding: '0.7rem 0' }}>
+          <span style={{ fontSize: '1rem' }}>🔒</span>
+          <input
+            type="password"
+            value={loginPassword}
+            onChange={e => setLoginPassword(e.target.value)}
+            placeholder="Password"
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: '0.85rem', color: '#2a2426' }}
+          />
+        </div>
+        {loginError && <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.75rem' }}>{loginError}</p>}
+        <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <button onClick={() => { setAuthMode('register'); setLoginError('') }} className="pf-link-btn" style={{ fontSize: '0.8rem' }}>
+            New here? Register instead
+          </button>
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
+          <button onClick={() => setStep('cart')} className="pf-link-btn" style={{ fontSize: '0.85rem' }} disabled={loggingIn}>← Back to cart</button>
+          <button onClick={handleLogin} disabled={loggingIn} className="pf-btn" style={{ flex: 1, justifyContent: 'center' }}>
+            {loggingIn ? 'Logging in…' : 'Log In & Continue'}
+          </button>
+        </div>
+      </HelpDeskModal>
+    )
+  }
+
   if (step === 'register') {
     return (
       <HelpDeskModal title="Client Registration" avatar={PenfixLogoAvatar} onClose={onClose} anchor="top">
@@ -455,6 +521,7 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderBottom: '1px solid #eee1d6', padding: '0.7rem 0' }}>
             <span style={{ fontSize: '1rem' }}>{f.icon}</span>
             <input
+              type={f.type ?? 'text'}
               value={registerValues[i] ?? ''}
               onChange={e => setRegisterValues(prev => ({ ...prev, [i]: e.target.value }))}
               placeholder={f.placeholder}
@@ -463,7 +530,12 @@ export function JobOrderModal({ cart, onClose, onOrderPlaced }: { cart: DraftIte
           </div>
         ))}
         {registerError && <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.75rem' }}>{registerError}</p>}
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+        <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <button onClick={() => { setAuthMode('login'); setRegisterError('') }} className="pf-link-btn" style={{ fontSize: '0.8rem' }}>
+            Already registered? Log in instead
+          </button>
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
           <button onClick={() => setStep('cart')} className="pf-link-btn" style={{ fontSize: '0.85rem' }} disabled={registering}>← Back to cart</button>
           <button onClick={handleRegisterAndCheckout} disabled={registering} className="pf-btn" style={{ flex: 1, justifyContent: 'center' }}>
             {registering ? 'Saving…' : 'Register & Continue'}
