@@ -141,6 +141,9 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
 
   function handleAdd() {
     if (!dateNeeded) { setFormError('Please set a deadline/date needed.'); return }
+    if (quoteOnly && !originalFileName) { setFormError('Please attach a reference image so our team understands what you want.'); return }
+    if (quoteOnly && !productionSpecs.trim()) { setFormError('Please describe the specs/details for this quotation request.'); return }
+    if (quoteOnly && needsDims && (!width || !height)) { setFormError('Please enter width and height.'); return }
     setFormError('')
     onAdd({
       key: `${subcategory.subcategory_id}-${Date.now()}`,
@@ -193,7 +196,7 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
         )}
 
         <div className="pf-field">
-          <label className="pf-label">{quoteOnly ? 'Reference Image' : 'Item Preview'}</label>
+          <label className="pf-label">{quoteOnly ? 'Reference Image' : 'Item Preview'}{quoteOnly && <span className="pf-req">*</span>}</label>
           {preview ? (
             <div onPaste={handlePreviewPaste} tabIndex={0} style={{ display: 'flex', alignItems: 'center', gap: 12, outline: 'none' }}>
               <img
@@ -219,7 +222,7 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
               <input type="file" accept="image/*" onChange={e => handlePreviewFile(e.target.files?.[0] || null)} className="pf-input" style={{ border: 'none', padding: 0 }} />
               <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>
                 {quoteOnly ? (
-                  <>Optional — <b>upload</b> or <b>paste (Ctrl+V)</b> an image of the signage you want (a photo, sketch, or sample). Our team will use it as the reference for the design to be printed/fabricated and for preparing your quotation.</>
+                  <><b>Required</b> — <b>upload</b> or <b>paste (Ctrl+V)</b> an image of the signage you want (a photo, sketch, or sample). Our team will use it as the reference for the design to be printed/fabricated and for preparing your quotation.</>
                 ) : (
                   <>Optional — <b>upload</b> the actual file you want printed, or <b>paste (Ctrl+V)</b> a reference/mockup image if you&apos;re just showing us the layout idea you want.</>
                 )}
@@ -269,11 +272,11 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
         {needsDims && (
           <div className={needsDepth ? 'pf-grid-3' : 'pf-grid-2'} style={{ marginBottom: '0.85rem' }}>
             <div>
-              <label className="pf-label">Width</label>
+              <label className="pf-label">Width{quoteOnly && <span className="pf-req">*</span>}</label>
               <input type="number" value={width} onChange={e => setWidth(e.target.value)} placeholder={linearUnitLabel(subcategory.unit)} className="pf-input" />
             </div>
             <div>
-              <label className="pf-label">Height</label>
+              <label className="pf-label">Height{quoteOnly && <span className="pf-req">*</span>}</label>
               <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder={linearUnitLabel(subcategory.unit)} className="pf-input" />
             </div>
             {needsDepth && (
@@ -300,8 +303,8 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
         )}
 
         <div className="pf-field">
-          <label className="pf-label">Production Specs / Description</label>
-          <textarea value={productionSpecs} onChange={e => setProductionSpecs(e.target.value)} rows={2} placeholder="Material, size details, color, etc." className="pf-textarea" />
+          <label className="pf-label">Production Specs / Description{quoteOnly && <span className="pf-req">*</span>}</label>
+          <textarea value={productionSpecs} onChange={e => setProductionSpecs(e.target.value)} rows={2} placeholder={quoteOnly ? 'Required — describe materials, size, colors, mounting/installation details, etc.' : 'Material, size details, color, etc.'} className="pf-textarea" />
         </div>
 
         <div className="pf-field">
