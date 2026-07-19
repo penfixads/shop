@@ -18,6 +18,7 @@ interface Subcategory {
   pricing_model: string
   base_price: number
   unit: string | null
+  description: string | null
 }
 
 interface Props {
@@ -236,13 +237,13 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
             {pageItems.map(s => (
               <div key={s.subcategory_id} style={{ background: '#fff', border: '1px solid #eee1d6', borderRadius: 12, padding: '1rem' }}>
                 {imageMap[s.subcategory_id] ? (
-                  <div style={{ position: 'relative', height: 100, borderRadius: 8, marginBottom: '0.75rem', overflow: 'hidden', background: '#F9EBD8' }}>
+                  <div title={s.description || undefined} style={{ position: 'relative', height: 100, borderRadius: 8, marginBottom: '0.75rem', overflow: 'hidden', background: '#F9EBD8' }}>
                     <Image src={imageMap[s.subcategory_id]} alt={s.subcategory_name} fill style={{ objectFit: 'cover' }} />
                   </div>
                 ) : (
-                  <div style={{ height: 100, background: '#F9EBD8', borderRadius: 8, marginBottom: '0.75rem' }} />
+                  <div title={s.description || undefined} style={{ height: 100, background: '#F9EBD8', borderRadius: 8, marginBottom: '0.75rem' }} />
                 )}
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#2a2426' }}>{s.subcategory_name}</div>
+                <div title={s.description || undefined} style={{ fontWeight: 600, fontSize: '0.9rem', color: '#2a2426' }}>{s.subcategory_name}</div>
                 <div style={{ fontSize: '0.72rem', color: '#999', marginBottom: '0.4rem' }}>{s.subcategory_id}</div>
                 <div style={{ fontSize: '0.85rem', color: '#1a5a1a', fontWeight: 600, marginBottom: '0.75rem' }}>
                   {isQuoteOnlyCategory(s.category_id)
