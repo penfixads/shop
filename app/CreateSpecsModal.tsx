@@ -55,11 +55,16 @@ interface Subcategory {
 interface Props {
   subcategory: Subcategory
   initialQty: number
+  // Forces quote-only mode even outside the fully quote-only categories (signage) —
+  // used by "starts at" categories (e.g. Custom Merchandize) whose card offers both a
+  // normal Create Specs button and a secondary Request Quotation link for a requirement
+  // the specs form doesn't cover. Left undefined, quote-only falls back to the category.
+  quoteOnlyOverride?: boolean
   onClose: () => void
   onAdd: (item: DraftItem) => void
 }
 
-export default function CreateSpecsModal({ subcategory, initialQty, onClose, onAdd }: Props) {
+export default function CreateSpecsModal({ subcategory, initialQty, quoteOnlyOverride, onClose, onAdd }: Props) {
   const [quantity, setQuantity] = useState(String(initialQty))
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
@@ -81,7 +86,8 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
 
   const pricingModel = subcategory.pricing_model
   const basePrice = subcategory.base_price
-  const quoteOnly = isQuoteOnlyCategory(subcategory.category_id)
+  const isCategoryQuoteOnly = isQuoteOnlyCategory(subcategory.category_id)
+  const quoteOnly = quoteOnlyOverride ?? isCategoryQuoteOnly
 
   const needsDims = ['area', 'dimension', 'area_cube', 'per_lettersqft'].includes(pricingModel)
   const needsDepth = pricingModel === 'area_cube'
@@ -183,10 +189,16 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
 
         {quoteOnly ? (
           <div style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 8, padding: '0.6rem 0.75rem', marginBottom: '1rem', color: '#C9A84C', fontSize: '0.78rem', lineHeight: 1.5 }}>
-            Signage projects are priced per project — the rate shown is only a starting point,
-            and the final price depends on materials, size, and installation. Fill in your
-            specifics below and our team will prepare a proper quotation for you — no payment
-            is due until you approve it.
+            {isCategoryQuoteOnly ? (
+              <>Signage projects are priced per project — the rate shown is only a starting point,
+              and the final price depends on materials, size, and installation. Fill in your
+              specifics below and our team will prepare a proper quotation for you — no payment
+              is due until you approve it.</>
+            ) : (
+              <>Didn&apos;t find the exact specs you need? Describe what you&apos;re looking for below
+              and our team will prepare a custom quotation for you — no payment is due until you
+              approve it.</>
+            )}
           </div>
         ) : (
           <div className="pf-field">
@@ -222,7 +234,7 @@ export default function CreateSpecsModal({ subcategory, initialQty, onClose, onA
               <input type="file" accept="image/*" onChange={e => handlePreviewFile(e.target.files?.[0] || null)} className="pf-input" style={{ border: 'none', padding: 0 }} />
               <div style={{ color: '#E8B9C6', fontSize: '0.7rem', marginTop: 6 }}>
                 {quoteOnly ? (
-                  <><b>Required</b> — <b>upload</b> or <b>paste (Ctrl+V)</b> an image of the signage you want (a photo, sketch, or sample). Our team will use it as the reference for the design to be printed/fabricated and for preparing your quotation.</>
+                  <><b>Required</b> — <b>upload</b> or <b>paste (Ctrl+V)</b> an image of what you want (a photo, sketch, or sample). Our team will use it as the reference for the design to be printed/fabricated and for preparing your quotation.</>
                 ) : (
                   <>Optional — <b>upload</b> the actual file you want printed, or <b>paste (Ctrl+V)</b> a reference/mockup image if you&apos;re just showing us the layout idea you want.</>
                 )}

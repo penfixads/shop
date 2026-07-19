@@ -11,6 +11,17 @@ export function isQuoteOnlyCategory(categoryId: string | null | undefined): bool
   return !!categoryId && QUOTE_ONLY_CATEGORY_IDS.has(categoryId)
 }
 
+// Unlike QUOTE_ONLY categories (signage — no self-service pricing at all), these still
+// have a real, usable Create Specs flow with real pricing — "Starts at" here is just
+// honest framing, since custom merch options (materials, add-ons, finishes) can push the
+// price above the base rate. Their cards keep the normal "Create Specs" button but also
+// show a secondary "Request Quotation" link for a requirement the specs form doesn't cover.
+export const STARTS_AT_CATEGORY_IDS = new Set(['CAT_CMR'])
+
+export function isStartsAtCategory(categoryId: string | null | undefined): boolean {
+  return !!categoryId && STARTS_AT_CATEGORY_IDS.has(categoryId)
+}
+
 // Quote-only cards still show a ballpark rate, but phrased "Starts at ₱X / sqft"
 // instead of "From ₱X / sqft" — it's a floor for the client's expectations, not
 // the basis of the final price (that comes from the staff-prepared quotation).

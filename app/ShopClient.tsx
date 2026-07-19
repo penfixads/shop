@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useLayoutEffect, useEffect } from 'react'
 import Image from 'next/image'
-import { formatPriceLabel, formatStartsAtLabel, isQuoteOnlyCategory } from '@/lib/pricing'
+import { formatPriceLabel, formatStartsAtLabel, isQuoteOnlyCategory, isStartsAtCategory } from '@/lib/pricing'
 import CreateSpecsModal, { type DraftItem } from './CreateSpecsModal'
 import { RegistrationModal, RewardsModal, JobOrderModal } from './HelpDeskModals'
 
@@ -56,6 +56,7 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
   const [helpMenuOpen, setHelpMenuOpen] = useState(false)
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false)
   const [specsFor, setSpecsFor] = useState<Subcategory | null>(null)
+  const [forceQuoteOnly, setForceQuoteOnly] = useState<true | undefined>(undefined)
   const [cart, setCart] = useState<DraftItem[]>([])
   const [activeHelpModal, setActiveHelpModal] = useState<'registration' | 'rewards' | null>(null)
   const [jobOrderOpen, setJobOrderOpen] = useState(false)
@@ -246,7 +247,7 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
                 <div title={s.description || undefined} style={{ fontWeight: 600, fontSize: '0.9rem', color: '#2a2426' }}>{s.subcategory_name}</div>
                 <div style={{ fontSize: '0.72rem', color: '#999', marginBottom: '0.4rem' }}>{s.subcategory_id}</div>
                 <div style={{ fontSize: '0.85rem', color: '#1a5a1a', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  {isQuoteOnlyCategory(s.category_id)
+                  {isQuoteOnlyCategory(s.category_id) || isStartsAtCategory(s.category_id)
                     ? formatStartsAtLabel(s.pricing_model, s.base_price, s.unit)
                     : formatPriceLabel(s.pricing_model, s.base_price, s.unit)}
                 </div>
@@ -256,10 +257,15 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
                     <span style={{ fontSize: '0.85rem', minWidth: 16, textAlign: 'center' }}>{getQty(s.subcategory_id)}</span>
                     <button className="pf-btn pf-btn-secondary" style={{ padding: '0.15rem 0.5rem' }} onClick={() => setQty(s.subcategory_id, getQty(s.subcategory_id) + 1)}>+</button>
                   </div>
-                  <button className="pf-link-btn" style={{ fontSize: '0.85rem' }} onClick={() => setSpecsFor(s)}>
+                  <button className="pf-link-btn" style={{ fontSize: '0.85rem' }} onClick={() => { setSpecsFor(s); setForceQuoteOnly(undefined) }}>
                     {isQuoteOnlyCategory(s.category_id) ? 'Request Quotation' : 'Create Specs'}
                   </button>
                 </div>
+                {isStartsAtCategory(s.category_id) && (
+                  <button className="pf-link-btn" style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.4rem' }} onClick={() => { setSpecsFor(s); setForceQuoteOnly(true) }}>
+                    Don&apos;t see your specs? Request a Quotation
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -327,8 +333,9 @@ export default function ShopClient({ categories, subcategories, imageMap }: Prop
             category_name: categories.find(c => c.category_id === specsFor.category_id)?.category_name ?? '',
           }}
           initialQty={getQty(specsFor.subcategory_id)}
-          onClose={() => setSpecsFor(null)}
-          onAdd={item => { setCart(prev => [...prev, item]); setSpecsFor(null) }}
+          quoteOnlyOverride={forceQuoteOnly}
+          onClose={() => { setSpecsFor(null); setForceQuoteOnly(undefined) }}
+          onAdd={item => { setCart(prev => [...prev, item]); setSpecsFor(null); setForceQuoteOnly(undefined) }}
         />
       )}
 

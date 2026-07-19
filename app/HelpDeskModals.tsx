@@ -278,7 +278,11 @@ export function PhoenixAssistModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-const BlankAvatar = <div style={{ width: '100%', height: '100%', background: '#F9EBD8' }} />
+const RewardsAvatar = (
+  <div style={{ width: '100%', height: '100%', position: 'relative', background: '#F9EBD8' }}>
+    <Image src="/logo_rewards.jpg" alt="Rewards" fill sizes="84px" style={{ objectFit: 'cover' }} />
+  </div>
+)
 
 // 1 point = ₱1 earned (rewards_ledger credits 1% of each paid JO's grand_total).
 // Thresholds picked from the real client base's earned-points distribution:
@@ -357,7 +361,7 @@ export function RewardsModal({ onClose }: { onClose: () => void }) {
 
   if (!activeClient) {
     return (
-      <HelpDeskModal title="Rewards" avatar={BlankAvatar} onClose={onClose}>
+      <HelpDeskModal title="Rewards" avatar={RewardsAvatar} onClose={onClose}>
         <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1.25rem', textAlign: 'center' }}>
           Register first to get your rewards QR and start earning points.
         </p>
@@ -375,7 +379,7 @@ export function RewardsModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <HelpDeskModal title="Rewards" avatar={BlankAvatar} onClose={onClose}>
+    <HelpDeskModal title="Rewards" avatar={RewardsAvatar} onClose={onClose}>
       <ClientQrCode
         clientId={activeClient.clientId}
         clientName={activeClient.clientName}
